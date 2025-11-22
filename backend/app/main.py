@@ -1,5 +1,7 @@
 from datetime import date, datetime, timedelta
 from typing import Any, Dict
+from .google_auth import build_flow
+from urllib.parse import urlencode
 
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
@@ -313,3 +315,26 @@ def debug_users() -> Dict[str, Any]:
 @app.get("/api/debug/profiles")
 def debug_profiles() -> Dict[str, Any]:
     return PROFILES
+
+
+@app.get("/api/google/auth-url")
+def get_google_auth_url(user_id: str):
+    if user_id not in USERS:
+        raise HTTPException(status_code=404, detail="User not found")
+
+    redirect_uri = "http://localhost:8000/api/google/oauth2callback"
+
+    try:
+        flow = build_flow(redirect_uri)
+    except Exception as e:
+        # TEMP debug: show actual reason instead of generic 500
+        raise HTTPException(status_code=500, detail=f"Flow error: {e}")
+
+    auth_url, state = flow.authorization_url(
+        access_type="offline",
+        include_granted_scopes="true",
+        prompt="consent",
+    )
+
+    auth_url_with_user = auth_url + "&" + urlencode({"user_id": user_id})
+    return {"auth_url": auth_url_with_user}

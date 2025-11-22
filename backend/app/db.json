@@ -3,6 +3,10 @@
     "f8e99a74-bf5d-4231-96e2-fd61ec2f050a": {
       "id": "f8e99a74-bf5d-4231-96e2-fd61ec2f050a",
       "email": "marriia.hoii@gmail.com"
+    },
+    "b81389f7-1644-4fb5-9fc3-50a2b00b776b": {
+      "id": "b81389f7-1644-4fb5-9fc3-50a2b00b776b",
+      "email": "marii@gmail.com"
     }
   },
   "profiles": {
@@ -15,6 +19,18 @@
         "Fatigue"
       ],
       "medication": ".",
+      "workout_intensity": "medium"
+    },
+    "b81389f7-1644-4fb5-9fc3-50a2b00b776b": {
+      "user_id": "b81389f7-1644-4fb5-9fc3-50a2b00b776b",
+      "last_period_start": "2025-11-22",
+      "cycle_length": 25,
+      "menstruation_phase_duration": 3,
+      "symptoms": [
+        "Cramps",
+        "Breast tenderness"
+      ],
+      "medication": "khjg",
       "workout_intensity": "medium"
     }
   }
