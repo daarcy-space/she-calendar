@@ -169,3 +169,63 @@ a:hover {
   box-shadow: none;
   color: #6b7280;
 }
+
+/* floating "slide up" animation for quiz steps */
+@keyframes quiz-float-up {
+  from {
+    opacity: 0;
+    transform: translateY(14px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.quiz-card {
+  animation: quiz-float-up 0.35s ease-out;
+}
+
+/* symptom / activity chips */
+
+.quiz-options {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  margin-top: 1rem;
+  justify-content: center;
+}
+
+.quiz-chip {
+  border-radius: 999px;
+  border: 1px solid #e5e7eb;
+  padding: 0.4rem 0.9rem;
+  font-size: 0.85rem;
+  background-color: #ffffff;
+  color: #111827;
+  cursor: pointer;
+  transition:
+    background-color 0.15s ease,
+    color 0.15s ease,
+    border-color 0.15s ease,
+    box-shadow 0.15s ease,
+    transform 0.15s ease;
+}
+
+.quiz-chip-full {
+  width: 100%;
+  max-width: 320px;
+  justify-content: center;
+  text-align: center;
+}
+
+.quiz-chip:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 8px 20px rgba(15, 23, 42, 0.06);
+}
+
+.quiz-chip-selected {
+  background-color: #111827;
+  color: #ffffff;
+  border-color: #111827;
+}

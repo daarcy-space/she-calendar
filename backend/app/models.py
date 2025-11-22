@@ -1,6 +1,5 @@
 from datetime import date
 from typing import Optional
-
 from pydantic import BaseModel, EmailStr
 
 
@@ -61,3 +60,46 @@ class QuizProfileResponse(BaseModel):
     last_period_start: date
     cycle_length: int
     prefers_workout_time: Optional[str] = None
+
+class PhaseTips(BaseModel):
+  headline: str
+  do: List[str]
+  avoid: List[str]
+
+
+class CycleSummaryResponse(BaseModel):
+  user_id: str
+  today: date
+  cycle_day: int
+  phase: str
+  phase_label: str
+  tips: PhaseTips
+
+
+class TaskToPlan(BaseModel):
+  title: str
+  category: str  # "work" | "uni" | "social" | etc.
+  start_iso: str  # ISO datetime string
+  duration_hours: float
+
+
+class PlanEvaluateRequest(BaseModel):
+  user_id: str
+  tasks: List[TaskToPlan]
+
+
+class TaskPlanSuggestion(BaseModel):
+  title: str
+  category: str
+  original_start_iso: str
+  phase_at_original: str
+  is_ideal: bool
+  reason: str
+  suggested_start_iso: Optional[str] = None
+  suggested_phase: Optional[str] = None
+
+
+class PlanEvaluateResponse(BaseModel):
+  user_id: str
+  suggestions: List[TaskPlanSuggestion]
+
