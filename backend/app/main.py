@@ -1,5 +1,9 @@
-from fastapi import FastAPI, HTTPException
 from datetime import date, datetime, timedelta
+from typing import Any, Dict
+
+from fastapi import FastAPI, HTTPException
+from fastapi.middleware.cors import CORSMiddleware
+
 from .models import (
     RegisterRequest,
     RegisterResponse,
@@ -13,50 +17,149 @@ from .models import (
     PlanEvaluateResponse,
     TaskPlanSuggestion,
 )
-from .storage import USERS, PROFILES, create_user, get_user_by_email
-from .phase_engine import get_cycle_day, get_phase, get_phase_label, get_phase_tips
+from .storage import (
+    USERS,
+    PROFILES,
+    create_user,
+    get_user_by_email,
+    save_profile,
+)
+from .phase_engine import (
+    get_cycle_day,
+    get_phase,
+    get_phase_label,
+    get_phase_tips,
+)
 
-app = FastAPI()
+app = FastAPI(title="she.Calendar API")
+
+# --- CORS so frontend (Vite) can talk to backend on localhost ---
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=[
+        "http://localhost:5173",
+        "http://127.0.0.1:5173",
+    ],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
+
+# ---------- AUTH ----------
 
 @app.post("/api/auth/register", response_model=RegisterResponse)
-def register(payload: RegisterRequest):
-    # if email already exists, you can either reject or just reuse
-    existing = get_user_by_email(payload.email)
-    if existing:
-        # for now, treat as "already registered"
-        return RegisterResponse(user_id=existing["id"], email=existing["email"])
-
+def register(payload: RegisterRequest) -> RegisterResponse:
+    """
+    Create or return a user by email.
+    This is called from the first-time onboarding flow.
+    """
     user = create_user(payload.email)
     return RegisterResponse(user_id=user["id"], email=user["email"])
 
+
+@app.post("/api/auth/login", response_model=LoginResponse)
+def login(payload: LoginRequest) -> LoginResponse:
+    """
+    Login for returning users by email.
+    """
+    user = get_user_by_email(payload.email)
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+
+    profile = PROFILES.get(user["id"])
+
+    last_period_start = None
+    cycle_length = None
+    workout_pref = None
+
+    if profile:
+        lps = profile.get("last_period_start")
+        if isinstance(lps, str):
+            try:
+                last_period_start = date.fromisoformat(lps)
+            except ValueError:
+                last_period_start = None
+        cycle_length = profile.get("cycle_length")
+        workout_pref = profile.get("workout_intensity")
+
+    return LoginResponse(
+        user_id=user["id"],
+        email=user["email"],
+        last_period_start=last_period_start,
+        cycle_length=cycle_length,
+        prefers_workout_time=workout_pref,
+    )
+
+
+# ---------- ONBOARDING QUIZ / PROFILE ----------
+
 @app.post("/api/profile/quiz", response_model=QuizProfileResponse)
-def save_quiz_profile(payload: QuizProfileInput):
+def save_quiz_profile(payload: QuizProfileInput) -> QuizProfileResponse:
+    """
+    Save the initial onboarding quiz answers as the user's cycle profile.
+    """
     user_id = payload.user_id
 
     if user_id not in USERS:
         raise HTTPException(status_code=404, detail="User not found")
 
-    PROFILES[user_id] = {
-        "user_id": user_id,
-        "last_period_start": payload.last_period_start,
-        "cycle_length": payload.cycle_length,
-        "prefers_workout_time": payload.prefers_workout_time,
-    }
-
-    return QuizProfileResponse(
+    profile = save_profile(
         user_id=user_id,
         last_period_start=payload.last_period_start,
         cycle_length=payload.cycle_length,
-        prefers_workout_time=payload.prefers_workout_time,
+        menstruation_phase_duration=payload.menstruation_phase_duration,
+        symptoms=payload.symptoms,
+        medication=payload.medication,
+        workout_intensity=payload.workout_intensity,
     )
 
+    # last_period_start stored as ISO string in db.json
+    lps_raw = profile["last_period_start"]
+    lps_date = (
+        date.fromisoformat(lps_raw)
+        if isinstance(lps_raw, str)
+        else payload.last_period_start
+    )
+
+    return QuizProfileResponse(
+        user_id=user_id,
+        last_period_start=lps_date,
+        cycle_length=profile["cycle_length"],
+        menstruation_phase_duration=profile["menstruation_phase_duration"],
+        symptoms=profile["symptoms"],
+        medication=profile["medication"],
+        workout_intensity=profile["workout_intensity"],
+    )
+
+
+# ---------- CYCLE SUMMARY FOR DASHBOARD ----------
+
 @app.get("/api/user/{user_id}/cycle-summary", response_model=CycleSummaryResponse)
-def get_cycle_summary(user_id: str):
+def get_cycle_summary(user_id: str) -> CycleSummaryResponse:
+    """
+    Return current cycle day, phase, and short tips for the dashboard.
+    """
     if user_id not in PROFILES:
         raise HTTPException(status_code=404, detail="Profile not found")
 
     profile = PROFILES[user_id]
-    last_period_start = profile["last_period_start"]
+
+    # last_period_start is stored as ISO string in db.json
+    lps_raw = profile.get("last_period_start")
+    if not lps_raw:
+        raise HTTPException(status_code=400, detail="Profile incomplete")
+
+    try:
+        last_period_start = (
+            date.fromisoformat(lps_raw)
+            if isinstance(lps_raw, str)
+            else lps_raw
+        )
+    except Exception:
+        raise HTTPException(status_code=400, detail="Invalid last_period_start in profile")
+
     cycle_length = profile.get("cycle_length", 28)
     bleed_days = profile.get("menstruation_phase_duration", 5)
 
@@ -81,6 +184,9 @@ def get_cycle_summary(user_id: str):
         tips=tips,
     )
 
+
+# ---------- PLANNING EVALUATION ----------
+
 def _category_target_phases(category: str):
     category = category.lower()
     if category in {"social", "dating", "networking"}:
@@ -89,18 +195,35 @@ def _category_target_phases(category: str):
         return ["follicular", "ovulation", "luteal"]
     if category in {"selfcare", "rest"}:
         return ["menstrual", "luteal"]
-    # default: everything is fine almost anywhere
+    # default: accept all phases
     return ["menstrual", "follicular", "ovulation", "luteal"]
 
 
 @app.post("/api/plan/evaluate", response_model=PlanEvaluateResponse)
-def evaluate_plan(payload: PlanEvaluateRequest):
+def evaluate_plan(payload: PlanEvaluateRequest) -> PlanEvaluateResponse:
+    """
+    Given a list of tasks (title, category, day+time), check if the time
+    is ideal for the user's cycle phase, and if not suggest a better slot.
+    """
     user_id = payload.user_id
     if user_id not in PROFILES:
         raise HTTPException(status_code=404, detail="Profile not found")
 
     profile = PROFILES[user_id]
-    last_period_start = profile["last_period_start"]
+
+    lps_raw = profile.get("last_period_start")
+    if not lps_raw:
+        raise HTTPException(status_code=400, detail="Profile incomplete")
+
+    try:
+        last_period_start = (
+            date.fromisoformat(lps_raw)
+            if isinstance(lps_raw, str)
+            else lps_raw
+        )
+    except Exception:
+        raise HTTPException(status_code=400, detail="Invalid last_period_start in profile")
+
     cycle_length = profile.get("cycle_length", 28)
     bleed_days = profile.get("menstruation_phase_duration", 5)
 
@@ -132,7 +255,7 @@ def evaluate_plan(payload: PlanEvaluateRequest):
             )
             continue
 
-        # find a better day within the next 7 days
+        # look for a better day within a small window around the chosen time
         best_dt = None
         best_phase = None
         for delta_days in range(-3, 8):
@@ -162,10 +285,9 @@ def evaluate_plan(payload: PlanEvaluateRequest):
                 )
             )
         else:
-            # no better slot found nearby
             reason = (
-                f"This isn&apos;t in your ideal phase for {task.category}, "
-                "but we didn&apos;t find a clearly better slot in the next week."
+                f"This isn’t in your ideal phase for {task.category}, "
+                "but we didn’t find a clearly better slot in the next week."
             )
             suggestions.append(
                 TaskPlanSuggestion(
@@ -180,3 +302,14 @@ def evaluate_plan(payload: PlanEvaluateRequest):
 
     return PlanEvaluateResponse(user_id=user_id, suggestions=suggestions)
 
+
+# ---------- DEBUG ENDPOINTS (for you, not for production) ----------
+
+@app.get("/api/debug/users")
+def debug_users() -> Dict[str, Any]:
+    return USERS
+
+
+@app.get("/api/debug/profiles")
+def debug_profiles() -> Dict[str, Any]:
+    return PROFILES

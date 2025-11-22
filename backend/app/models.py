@@ -1,5 +1,5 @@
 from datetime import date
-from typing import Optional
+from typing import Optional, List
 from pydantic import BaseModel, EmailStr
 
 
@@ -42,24 +42,24 @@ class LoginResponse(BaseModel):
 # ---------- ONBOARDING QUIZ / PROFILE ----------
 
 class QuizProfileInput(BaseModel):
-    """
-    Body for saving the onboarding quiz answers (cycle profile)
-    for a specific user.
-    """
     user_id: str
     last_period_start: date
     cycle_length: int
-    prefers_workout_time: Optional[str] = None  # "morning" | "afternoon" | "evening"
+    menstruation_phase_duration: int
+    symptoms: List[str] = []
+    medication: str = ""
+    workout_intensity: str  # "low" | "medium" | "high"
 
 
 class QuizProfileResponse(BaseModel):
-    """
-    Response after saving / updating the quiz profile.
-    """
     user_id: str
     last_period_start: date
     cycle_length: int
-    prefers_workout_time: Optional[str] = None
+    menstruation_phase_duration: int
+    symptoms: List[str] = []
+    medication: str = ""
+    workout_intensity: str
+
 
 class PhaseTips(BaseModel):
   headline: str

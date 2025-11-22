@@ -229,3 +229,21 @@ a:hover {
   color: #ffffff;
   border-color: #111827;
 }
+
+.quiz-slider-container {
+  width: 100%;
+}
+
+.quiz-slider {
+  width: 100%;
+  accent-color: #111827;
+}
+
+.quiz-slider-labels {
+  display: flex;
+  justify-content: space-between;
+  font-size: 0.75rem;
+  color: #9ca3af;
+  margin-top: 0.25rem;
+}
+

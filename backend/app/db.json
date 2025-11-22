@@ -1,0 +1,21 @@
+{
+  "users": {
+    "f8e99a74-bf5d-4231-96e2-fd61ec2f050a": {
+      "id": "f8e99a74-bf5d-4231-96e2-fd61ec2f050a",
+      "email": "marriia.hoii@gmail.com"
+    }
+  },
+  "profiles": {
+    "f8e99a74-bf5d-4231-96e2-fd61ec2f050a": {
+      "user_id": "f8e99a74-bf5d-4231-96e2-fd61ec2f050a",
+      "last_period_start": "2025-11-22",
+      "cycle_length": 25,
+      "menstruation_phase_duration": 3,
+      "symptoms": [
+        "Fatigue"
+      ],
+      "medication": ".",
+      "workout_intensity": "medium"
+    }
+  }
+}

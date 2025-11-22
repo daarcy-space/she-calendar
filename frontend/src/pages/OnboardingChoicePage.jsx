@@ -10,15 +10,16 @@ function OnboardingChoicePage({ onQuiz, onFloUpload, onBack }) {
           className="screen-title"
           style={{ fontSize: "1.6rem", marginTop: "1rem" }}
         >
-          How do you want to start?
+          How do you want to set up she.Calendar?
         </h2>
         <p className="screen-subtitle">
-          You can take a quick onboarding quiz or upload your Flo export.
+          You can either answer a quick quiz or upload your Flo export. Both
+          give your agent the information it needs to start planning.
         </p>
 
-        <div className="screen-actions">
+        <div className="screen-actions" style={{ marginTop: "2rem" }}>
           <button onClick={onQuiz} className="btn btn-primary">
-            Quick onboarding quiz
+            Take the onboarding quiz
           </button>
 
           <button onClick={onFloUpload} className="btn btn-secondary">

@@ -1,5 +1,7 @@
 import { useState } from "react";
+
 import IntroPage from "./pages/IntroPage";
+import RegisterPage from "./pages/RegisterPage";
 import OnboardingChoicePage from "./pages/OnboardingChoicePage";
 import OnboardingQuizPage from "./pages/OnboardingQuizPage";
 import FloUploadPage from "./pages/FloUploadPage";
@@ -10,86 +12,157 @@ import DashboardPage from "./pages/DashboardPage";
 function App() {
   const [step, setStep] = useState("intro");
   const [user, setUser] = useState(null);
+  const [calendarConnected, setCalendarConnected] = useState(false);
 
-  const handleFirstTime = () => setStep("onboarding-choice");
-  const handleReturningUser = () => setStep("login");
+  // -------- first-time flow --------
 
-  const handleOnboardingQuizComplete = (profileData) => {
-    console.log("Onboarding quiz data:", profileData);
-    setUser({ email: profileData.email || null, profileId: "temp-profile" });
-    setStep("dashboard");
+  const handleFirstTime = () => {
+    setStep("register");
   };
 
-  const handleFloUploadComplete = (profileId) => {
-    console.log("Flo profile created:", profileId);
-    setUser({ email: null, profileId });
+  const handleRegisterSuccess = (userData) => {
+    // userData: { userId, email, username }
+    setUser(userData);
+    setStep("onboarding-choice");
+  };
+
+  const handleOnboardingQuizComplete = async (quizData) => {
+  if (!user?.userId) {
+    alert("User missing in state");
+    return;
+  }
+
+  const payload = {
+    user_id: user.userId,
+    last_period_start: quizData.last_period_start,
+    cycle_length: quizData.cycle_length,
+    menstruation_phase_duration: quizData.menstruation_phase_duration,
+    symptoms: quizData.symptoms,
+    medication: quizData.medication,
+    workout_intensity: quizData.workout_intensity,
+  };
+
+  try {
+    const res = await fetch("http://localhost:8000/api/profile/quiz", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload),
+    });
+
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}));
+      console.error("quiz save error", err);
+      throw new Error(err.detail || "Failed to save profile");
+    }
+
+    const data = await res.json();
+
+    setUser((prev) => ({
+      ...prev,
+      lastPeriodStart: data.last_period_start,
+      cycleLength: data.cycle_length,
+      menstruationPhaseDuration: data.menstruation_phase_duration,
+      workoutIntensity: data.workout_intensity,
+    }));
+
+    setCalendarConnected(false);
     setStep("dashboard");
+  } catch (e) {
+    console.error(e);
+    alert("Error saving your cycle info");
+  }
+};
+
+
+  // -------- login / returning flow --------
+
+  const handleReturningUser = () => {
+    setStep("login");
   };
 
   const handleLoginSuccess = (userData) => {
+    // userData should contain { userId, email, ... }
     setUser(userData);
-    setStep("monthly-quiz");
-  };
-
-  const handleMonthlyQuizComplete = (quizData) => {
-    console.log("Monthly quiz:", quizData);
+    setCalendarConnected(false); // or true if you later persist this
     setStep("dashboard");
   };
 
+  const handleMonthlyQuizComplete = () => {
+    setStep("dashboard");
+  };
+
+  // -------- calendar connection (for now: just mark as connected) --------
+
+  const handleConnectCalendar = () => {
+    // later: open Google OAuth flow, then set this true when done
+    setCalendarConnected(true);
+  };
+
   return (
-    <div
-      style={{
-        minHeight: "100vh",
-        width: "100%",
-        display: "flex",
-        alignItems: "center",
-        justifyContent: "center",
-        background: "#f8fafc",
-        color: "#0f172a",
-      }}
-    >
-      <div style={{ width: "100%", maxWidth: 48000, padding: 24 }}>
-        {step === "intro" && (
-          <IntroPage
+    <>
+      {step === "intro" && (
+        <IntroPage
           onFirstTime={handleFirstTime}
           onReturning={handleReturningUser}
-          />
-        )}
-        {step === "onboarding-choice" && (
-          <OnboardingChoicePage
-            onQuiz={() => setStep("onboarding-quiz")}
-            onFloUpload={() => setStep("flo-upload")}
-            onBack={() => setStep("intro")}
-          />
-        )}
-        {step === "onboarding-quiz" && (
-          <OnboardingQuizPage
-            onComplete={handleOnboardingQuizComplete}
-            onBack={() => setStep("onboarding-choice")}
-          />
-        )}
-        {step === "flo-upload" && (
-          <FloUploadPage
-            onComplete={handleFloUploadComplete}
-            onBack={() => setStep("onboarding-choice")}
-          />
-        )}
-        {step === "login" && (
-          <LoginPage
-            onLoginSuccess={handleLoginSuccess}
-            onBack={() => setStep("intro")}
-          />
-        )}
-        {step === "monthly-quiz" && (
-          <MonthlyQuizPage
-            user={user}
-            onComplete={handleMonthlyQuizComplete}
-            onSkip={() => setStep("dashboard")}
-          />
-        )}
-        {step === "dashboard" && <DashboardPage user={user} />}
-      </div>
-    </div>
+        />
+      )}
+
+      {step === "register" && (
+        <RegisterPage
+          onRegisterSuccess={handleRegisterSuccess}
+          onBack={() => setStep("intro")}
+        />
+      )}
+
+      {step === "onboarding-choice" && (
+        <OnboardingChoicePage
+          onQuiz={() => setStep("onboarding-quiz")}
+          onFloUpload={() => setStep("flo-upload")}
+          onBack={() => setStep("register")}
+        />
+      )}
+
+      {step === "onboarding-quiz" && (
+        <OnboardingQuizPage
+          onComplete={handleOnboardingQuizComplete}
+          onBack={() => setStep("onboarding-choice")}
+        />
+      )}
+
+      {step === "flo-upload" && (
+        <FloUploadPage
+          onComplete={() => {
+            // after Flo import, go to dashboard & show connect calendar
+            setCalendarConnected(false);
+            setStep("dashboard");
+          }}
+          onBack={() => setStep("onboarding-choice")}
+        />
+      )}
+
+      {step === "login" && (
+        <LoginPage
+          onLoginSuccess={handleLoginSuccess}
+          onBack={() => setStep("intro")}
+        />
+      )}
+
+      {step === "monthly-quiz" && (
+        <MonthlyQuizPage
+          user={user}
+          onComplete={handleMonthlyQuizComplete}
+          onSkip={() => setStep("dashboard")}
+        />
+      )}
+
+      {step === "dashboard" && (
+        <DashboardPage
+          user={user}
+          calendarConnected={calendarConnected}
+          onConnectCalendar={handleConnectCalendar}
+        />
+      )}
+    </>
   );
 }
 

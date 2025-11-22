@@ -3,11 +3,12 @@ import { useState } from "react";
 function OnboardingQuizPage({ onComplete, onBack }) {
   const [step, setStep] = useState(0);
 
-  const [bleedDays, setBleedDays] = useState("");            // int
-  const [cycleLength, setCycleLength] = useState("");        // int
-  const [symptoms, setSymptoms] = useState([]);              // string[]
-  const [medication, setMedication] = useState("");          // string
-  const [activity, setActivity] = useState("medium");        // "low" | "medium" | "high"
+  const [bleedDays, setBleedDays] = useState(""); // int
+  const [cycleLength, setCycleLength] = useState(""); // int
+  const [symptoms, setSymptoms] = useState([]); // string[]
+  const [medication, setMedication] = useState(""); // string
+  const [activitySlider, setActivitySlider] = useState(2); // 1..3
+  const [activity, setActivity] = useState("medium"); // "low" | "medium" | "high"
 
   const symptomOptions = [
     "Cramps",
@@ -20,13 +21,13 @@ function OnboardingQuizPage({ onComplete, onBack }) {
     "Nausea",
   ];
 
-  const activityOptions = [
-    { value: "low", label: "Low – gentle walks / yoga most days" },
-    { value: "medium", label: "Medium – 2–3 workouts per week" },
-    { value: "high", label: "High – training or sports 4+ days/wk" },
-  ];
-
   const totalSteps = 5;
+
+  const sliderToLabel = (val) => {
+    if (val === 1) return "low";
+    if (val === 2) return "medium";
+    return "high";
+  };
 
   const toggleSymptom = (symptom) => {
     setSymptoms((prev) =>
@@ -37,32 +38,27 @@ function OnboardingQuizPage({ onComplete, onBack }) {
   };
 
   const handleNext = () => {
-    if (step < totalSteps - 1) {
-      setStep((s) => s + 1);
-    }
+    if (step < totalSteps - 1) setStep((s) => s + 1);
   };
 
   const handlePrev = () => {
-    if (step === 0) {
-      onBack();
-    } else {
-      setStep((s) => s - 1);
-    }
+    if (step === 0) onBack();
+    else setStep((s) => s - 1);
   };
 
   const handleFinish = (e) => {
-    e.preventDefault();
+  e.preventDefault();
 
-    const payload = {
-      menstruation_phase_duration: bleedDays ? Number(bleedDays) : null,
-      cycle_length: cycleLength ? Number(cycleLength) : null,
-      symptoms,                         // array of strings
-      medication: medication.trim(),    // string
-      workout_intensity: activity,      // "low" | "medium" | "high"
-    };
+  onComplete({
+    menstruation_phase_duration: bleedDays ? Number(bleedDays) : null,
+    cycle_length: cycleLength ? Number(cycleLength) : null,
+    symptoms,
+    medication: medication.trim(),
+    workout_intensity: activity,
+    last_period_start: new Date().toISOString().slice(0, 10), // or a real date question
+  });
+};
 
-    onComplete(payload);
-  };
 
   const renderStep = () => {
     switch (step) {
@@ -85,15 +81,11 @@ function OnboardingQuizPage({ onComplete, onBack }) {
                 type="number"
                 min={3}
                 max={7}
-                placeholder="For most people it’s 3–7 days"
+                placeholder="Most people: 3–7 days"
                 className="screen-input"
                 value={bleedDays}
                 onChange={(e) => setBleedDays(e.target.value)}
               />
-              <p className="screen-subtitle" style={{ marginTop: "0.5rem", fontSize: "0.8rem" }}>
-                This helps us understand how long your menstrual phase should be
-                treated as low-energy.
-              </p>
             </div>
           </>
         );
@@ -132,8 +124,7 @@ function OnboardingQuizPage({ onComplete, onBack }) {
               How does your period usually feel?
             </h2>
             <p className="screen-subtitle">
-              Pick the symptoms that show up most cycles. You can choose more
-              than one.
+              Pick the symptoms that show up most cycles. You can choose more than one.
             </p>
 
             <div className="quiz-options">
@@ -163,8 +154,7 @@ function OnboardingQuizPage({ onComplete, onBack }) {
               Do you usually take anything to help?
             </h2>
             <p className="screen-subtitle">
-              Painkillers, birth control, herbal remedies… whatever you feel
-              comfortable sharing.
+              Painkillers, birth control, herbal remedies… whatever you feel comfortable sharing.
             </p>
 
             <div className="screen-field" style={{ marginTop: "2rem" }}>
@@ -185,29 +175,41 @@ function OnboardingQuizPage({ onComplete, onBack }) {
         return (
           <>
             <h2 className="screen-title" style={{ fontSize: "1.6rem" }}>
-              What&apos;s your current activity level?
+              How active is your lifestyle right now?
             </h2>
             <p className="screen-subtitle">
-              This helps us suggest realistic workouts for each phase.
+              Slide to match how your weeks usually feel. This helps us suggest realistic workouts.
             </p>
 
-            <div className="quiz-options" style={{ marginTop: "1.5rem" }}>
-              {activityOptions.map((opt) => {
-                const selected = activity === opt.value;
-                return (
-                  <button
-                    key={opt.value}
-                    type="button"
-                    onClick={() => setActivity(opt.value)}
-                    className={
-                      "quiz-chip quiz-chip-full" +
-                      (selected ? " quiz-chip-selected" : "")
-                    }
-                  >
-                    {opt.label}
-                  </button>
-                );
-              })}
+            <div className="screen-field" style={{ marginTop: "2rem" }}>
+              <div className="quiz-slider-container">
+                <input
+                  type="range"
+                  min="1"
+                  max="3"
+                  step="1"
+                  value={activitySlider}
+                  onChange={(e) => {
+                    const val = Number(e.target.value);
+                    setActivitySlider(val);
+                    setActivity(sliderToLabel(val));
+                  }}
+                  className="quiz-slider"
+                />
+                <div className="quiz-slider-labels">
+                  <span>Low</span>
+                  <span>Medium</span>
+                  <span>High</span>
+                </div>
+              </div>
+
+              <p
+                className="screen-subtitle"
+                style={{ marginTop: "0.6rem", fontSize: "0.85rem" }}
+              >
+                Current selection:{" "}
+                <strong>{sliderToLabel(activitySlider).toUpperCase()}</strong>
+              </p>
             </div>
           </>
         );
@@ -218,8 +220,7 @@ function OnboardingQuizPage({ onComplete, onBack }) {
   };
 
   const isNextDisabled =
-    (step === 0 && !bleedDays) ||
-    (step === 1 && !cycleLength);
+    (step === 0 && !bleedDays) || (step === 1 && !cycleLength);
 
   return (
     <div className="screen-root">
@@ -236,11 +237,7 @@ function OnboardingQuizPage({ onComplete, onBack }) {
             color: "#9ca3af",
           }}
         >
-          <button
-            type="button"
-            onClick={handlePrev}
-            className="btn-ghost"
-          >
+          <button type="button" onClick={handlePrev} className="btn-ghost">
             {step === 0 ? "← Back" : "← Previous"}
           </button>
           <span>
@@ -262,7 +259,7 @@ function OnboardingQuizPage({ onComplete, onBack }) {
             </button>
           ) : (
             <button type="submit" className="btn btn-primary">
-              Finish setup
+              Save & go to calendar
             </button>
           )}
         </div>
