@@ -1,9 +1,12 @@
 from datetime import date, datetime, timedelta
 from typing import Any, Dict
 from .google_auth import build_flow
+from googleapiclient.discovery import build
+from google.oauth2.credentials import Credentials
 from urllib.parse import urlencode
 
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException, Request
+from fastapi.responses import RedirectResponse
 from fastapi.middleware.cors import CORSMiddleware
 
 from .models import (
@@ -25,6 +28,8 @@ from .storage import (
     create_user,
     get_user_by_email,
     save_profile,
+    save_google_tokens,
+    load_google_credentials,
 )
 from .phase_engine import (
     get_cycle_day,
@@ -36,6 +41,8 @@ from .phase_engine import (
 app = FastAPI(title="she.Calendar API")
 
 # --- CORS so frontend (Vite) can talk to backend on localhost ---
+
+REDIRECT_URI = "http://localhost:8000/api/google/oauth2callback"
 
 app.add_middleware(
     CORSMiddleware,
@@ -319,22 +326,56 @@ def debug_profiles() -> Dict[str, Any]:
 
 @app.get("/api/google/auth-url")
 def get_google_auth_url(user_id: str):
+    """
+    Returns a Google OAuth URL for this user to connect their calendar.
+    """
     if user_id not in USERS:
         raise HTTPException(status_code=404, detail="User not found")
 
-    redirect_uri = "http://localhost:8000/api/google/oauth2callback"
+    try:
+        flow = build_flow()
+        flow.redirect_uri = REDIRECT_URI
+
+        auth_url, state = flow.authorization_url(
+            access_type="offline",
+            include_granted_scopes="true",
+            prompt="consent",
+            state=user_id,
+        )
+
+        return {"auth_url": auth_url}
+    except Exception as e:
+        # TEMP: surface the real error instead of silent 500
+        raise HTTPException(
+            status_code=500,
+            detail=f"google_auth_url_error: {e}",
+        )
+
+
+@app.get("/api/google/oauth2callback")
+def google_oauth_callback(request: Request):
+    """
+    Handles Google redirect, exchanges the code for tokens and saves them.
+    Then redirects back to the frontend with ?connected=1
+    """
+    full_url = str(request.url)
+    state = request.query_params.get("state")
+    user_id = state
+    if not user_id:
+        raise HTTPException(status_code=400, detail="Missing user_id")
 
     try:
-        flow = build_flow(redirect_uri)
+        flow = build_flow()
+        flow.redirect_uri = REDIRECT_URI
+        flow.fetch_token(authorization_response=full_url)
+
+        creds = flow.credentials
+        save_google_tokens(user_id, creds)
     except Exception as e:
-        # TEMP debug: show actual reason instead of generic 500
-        raise HTTPException(status_code=500, detail=f"Flow error: {e}")
+        raise HTTPException(
+            status_code=500,
+            detail=f"google_callback_error: {e}",
+        )
 
-    auth_url, state = flow.authorization_url(
-        access_type="offline",
-        include_granted_scopes="true",
-        prompt="consent",
-    )
+    return RedirectResponse("http://localhost:5173/?connected=1")
 
-    auth_url_with_user = auth_url + "&" + urlencode({"user_id": user_id})
-    return {"auth_url": auth_url_with_user}

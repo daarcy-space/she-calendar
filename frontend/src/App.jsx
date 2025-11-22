@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 
 import IntroPage from "./pages/IntroPage";
 import RegisterPage from "./pages/RegisterPage";
@@ -14,6 +14,32 @@ function App() {
   const [user, setUser] = useState(null);
   const [calendarConnected, setCalendarConnected] = useState(false);
 
+  // Load user + calendar connection flag after reload / Google redirect
+  useEffect(() => {
+    const stored = localStorage.getItem("shecalendar_user");
+    if (stored) {
+      try {
+        const parsed = JSON.parse(stored);
+        setUser(parsed);
+      } catch (e) {
+        console.error("Failed to parse stored user", e);
+      }
+    }
+
+    const params = new URLSearchParams(window.location.search);
+    if (params.get("connected") === "1") {
+      setCalendarConnected(true);
+      setStep("dashboard");
+    }
+  }, []);
+
+  // Persist user so we still have it after redirect
+  useEffect(() => {
+    if (user) {
+      localStorage.setItem("shecalendar_user", JSON.stringify(user));
+    }
+  }, [user]);
+
   // -------- first-time flow --------
 
   const handleFirstTime = () => {
@@ -27,63 +53,70 @@ function App() {
   };
 
   const handleOnboardingQuizComplete = async (quizData) => {
-  if (!user?.userId) {
-    alert("User missing in state");
-    return;
-  }
-
-  const payload = {
-    user_id: user.userId,
-    last_period_start: quizData.last_period_start,
-    cycle_length: quizData.cycle_length,
-    menstruation_phase_duration: quizData.menstruation_phase_duration,
-    symptoms: quizData.symptoms,
-    medication: quizData.medication,
-    workout_intensity: quizData.workout_intensity,
-  };
-
-  try {
-    const res = await fetch("http://localhost:8000/api/profile/quiz", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(payload),
-    });
-
-    if (!res.ok) {
-      const err = await res.json().catch(() => ({}));
-      console.error("quiz save error", err);
-      throw new Error(err.detail || "Failed to save profile");
+    // quizData: {
+    //   menstruation_phase_duration,
+    //   cycle_length,
+    //   symptoms,
+    //   medication,
+    //   workout_intensity,
+    //   last_period_start
+    // }
+    if (!user?.userId) {
+      alert("User missing in state");
+      return;
     }
 
-    const data = await res.json();
+    const payload = {
+      user_id: user.userId,
+      last_period_start: quizData.last_period_start,
+      cycle_length: quizData.cycle_length,
+      menstruation_phase_duration: quizData.menstruation_phase_duration,
+      symptoms: quizData.symptoms,
+      medication: quizData.medication,
+      workout_intensity: quizData.workout_intensity,
+    };
 
-    setUser((prev) => ({
-      ...prev,
-      lastPeriodStart: data.last_period_start,
-      cycleLength: data.cycle_length,
-      menstruationPhaseDuration: data.menstruation_phase_duration,
-      workoutIntensity: data.workout_intensity,
-    }));
+    try {
+      const res = await fetch("http://localhost:8000/api/profile/quiz", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+      });
 
-    setCalendarConnected(false);
-    setStep("dashboard");
-  } catch (e) {
-    console.error(e);
-    alert("Error saving your cycle info");
-  }
-};
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        console.error("quiz save error", err);
+        throw new Error(err.detail || "Failed to save profile");
+      }
 
+      const data = await res.json();
 
-  // -------- login / returning flow --------
+      setUser((prev) => ({
+        ...prev,
+        lastPeriodStart: data.last_period_start,
+        cycleLength: data.cycle_length,
+        menstruationPhaseDuration: data.menstruation_phase_duration,
+        workoutIntensity: data.workout_intensity,
+      }));
+
+      setCalendarConnected(false);
+      setStep("dashboard");
+    } catch (e) {
+      console.error(e);
+      alert("Error saving your cycle info");
+    }
+  };
+
+  // -------- returning user flow --------
 
   const handleReturningUser = () => {
     setStep("login");
   };
 
   const handleLoginSuccess = (userData) => {
-    // userData should contain { userId, email, ... }
+    // userData: { userId, email, username?, ... }
     setUser(userData);
-    setCalendarConnected(false); // or true if you later persist this
+    setCalendarConnected(false); // or true later if you persist it
     setStep("dashboard");
   };
 
@@ -91,12 +124,35 @@ function App() {
     setStep("dashboard");
   };
 
-  // -------- calendar connection (for now: just mark as connected) --------
+  // -------- Google Calendar connection --------
 
-  const handleConnectCalendar = () => {
-    // later: open Google OAuth flow, then set this true when done
-    setCalendarConnected(true);
+  const handleConnectCalendar = async () => {
+    if (!user?.userId) {
+      alert("No user found – please log in again.");
+      return;
+    }
+
+    try {
+      const res = await fetch(
+        `http://localhost:8000/api/google/auth-url?user_id=${user.userId}`
+      );
+      if (!res.ok) {
+        throw new Error("Failed to get Google auth URL");
+      }
+      const data = await res.json();
+      if (!data.auth_url) {
+        throw new Error("No auth_url in response");
+      }
+
+      // navigate to Google
+      window.location.href = data.auth_url;
+    } catch (e) {
+      console.error(e);
+      alert("Could not start Google connection");
+    }
   };
+
+  // -------- render step machine --------
 
   return (
     <>
@@ -132,7 +188,6 @@ function App() {
       {step === "flo-upload" && (
         <FloUploadPage
           onComplete={() => {
-            // after Flo import, go to dashboard & show connect calendar
             setCalendarConnected(false);
             setStep("dashboard");
           }}

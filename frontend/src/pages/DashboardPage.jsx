@@ -3,17 +3,20 @@ import { useEffect, useState } from "react";
 function DashboardPage({ user, calendarConnected, onConnectCalendar }) {
   const [summary, setSummary] = useState(null);
   const [loadingSummary, setLoadingSummary] = useState(false);
+
   const [planTitle, setPlanTitle] = useState("");
   const [category, setCategory] = useState("work");
   const [date, setDate] = useState("");
   const [time, setTime] = useState("");
   const [duration, setDuration] = useState(1);
+
   const [planResult, setPlanResult] = useState(null);
   const [planning, setPlanning] = useState(false);
   const [error, setError] = useState(null);
 
   const userId = user?.userId;
 
+  // Load cycle summary only when calendar is connected and user exists
   useEffect(() => {
     if (!userId || !calendarConnected) return;
 
@@ -72,7 +75,7 @@ function DashboardPage({ user, calendarConnected, onConnectCalendar }) {
         throw new Error("Planning request failed");
       }
       const data = await res.json();
-      setPlanResult(data.suggestions[0]);
+      setPlanResult(data.suggestions[0]); // we only send one task
     } catch (e) {
       console.error(e);
       setError("Could not evaluate this plan.");
@@ -84,7 +87,10 @@ function DashboardPage({ user, calendarConnected, onConnectCalendar }) {
   return (
     <div className="screen-root">
       <div className="screen-card" style={{ textAlign: "left" }}>
-        <h2 className="screen-title" style={{ fontSize: "1.8rem", textAlign: "center" }}>
+        <h2
+          className="screen-title"
+          style={{ fontSize: "1.8rem", textAlign: "center" }}
+        >
           Your cycle-aware calendar
         </h2>
         <p className="screen-subtitle" style={{ textAlign: "center" }}>
@@ -95,11 +101,12 @@ function DashboardPage({ user, calendarConnected, onConnectCalendar }) {
             : "Profile loaded from your cycle data."}
         </p>
 
-        {/* Step: connect calendar first */}
+        {/* STEP 1: ask to connect calendar */}
         {!calendarConnected && (
           <div style={{ marginTop: "2rem", textAlign: "center" }}>
             <p className="screen-subtitle">
-              To let she.Calendar actually move and evaluate events, connect your calendar.
+              To let she.Calendar actually read and adjust your events, connect
+              your Google Calendar.
             </p>
             <div className="screen-actions" style={{ marginTop: "1.5rem" }}>
               <button
@@ -113,10 +120,10 @@ function DashboardPage({ user, calendarConnected, onConnectCalendar }) {
           </div>
         )}
 
-        {/* Only show stats + planning once calendar is connected */}
+        {/* STEP 2: once connected, show stats + planning */}
         {calendarConnected && (
           <>
-            {/* cycle stats */}
+            {/* Cycle summary */}
             <div style={{ marginTop: "2rem" }}>
               {loadingSummary && (
                 <p className="screen-subtitle">Loading your cycle info…</p>
@@ -124,7 +131,10 @@ function DashboardPage({ user, calendarConnected, onConnectCalendar }) {
 
               {!loadingSummary && summary && (
                 <>
-                  <p className="screen-subtitle" style={{ fontSize: "0.9rem" }}>
+                  <p
+                    className="screen-subtitle"
+                    style={{ fontSize: "0.9rem" }}
+                  >
                     Today is{" "}
                     <strong>
                       day {summary.cycle_day} of your{" "}
@@ -150,16 +160,31 @@ function DashboardPage({ user, calendarConnected, onConnectCalendar }) {
                   >
                     <div>
                       <strong style={{ fontSize: "0.8rem" }}>Lean into</strong>
-                      <ul style={{ margin: "0.4rem 0 0 1rem", padding: 0 }}>
+                      <ul
+                        style={{
+                          margin: "0.4rem 0 0 1rem",
+                          padding: 0,
+                          listStyle: "disc",
+                        }}
+                      >
                         {summary.tips.do.map((tip) => (
                           <li key={tip}>{tip}</li>
                         ))}
                       </ul>
                     </div>
+
                     {summary.tips.avoid.length > 0 && (
                       <div>
-                        <strong style={{ fontSize: "0.8rem" }}>Watch out for</strong>
-                        <ul style={{ margin: "0.4rem 0 0 1rem", padding: 0 }}>
+                        <strong style={{ fontSize: "0.8rem" }}>
+                          Watch out for
+                        </strong>
+                        <ul
+                          style={{
+                            margin: "0.4rem 0 0 1rem",
+                            padding: 0,
+                            listStyle: "disc",
+                          }}
+                        >
                           {summary.tips.avoid.map((tip) => (
                             <li key={tip}>{tip}</li>
                           ))}
@@ -171,7 +196,7 @@ function DashboardPage({ user, calendarConnected, onConnectCalendar }) {
               )}
             </div>
 
-            {/* plan something */}
+            {/* Plan something section */}
             <div style={{ marginTop: "2.5rem" }}>
               <h3
                 className="screen-title"
@@ -181,7 +206,7 @@ function DashboardPage({ user, calendarConnected, onConnectCalendar }) {
               </h3>
               <p className="screen-subtitle">
                 Tell us what you&apos;re planning and when. We&apos;ll tell you
-                if that slot matches your phase.
+                if that slot matches your current phase.
               </p>
 
               <form onSubmit={handlePlanSubmit}>
@@ -251,7 +276,9 @@ function DashboardPage({ user, calendarConnected, onConnectCalendar }) {
                     className="btn btn-primary"
                     disabled={planning}
                   >
-                    {planning ? "Checking your phase…" : "Ask she.Calendar to check"}
+                    {planning
+                      ? "Checking your phase…"
+                      : "Ask she.Calendar to check"}
                   </button>
                 </div>
               </form>
@@ -274,7 +301,9 @@ function DashboardPage({ user, calendarConnected, onConnectCalendar }) {
                     marginTop: "1.5rem",
                     padding: "1rem 1.1rem",
                     borderRadius: "1rem",
-                    backgroundColor: planResult.is_ideal ? "#ecfdf3" : "#fef3c7",
+                    backgroundColor: planResult.is_ideal
+                      ? "#ecfdf3"
+                      : "#fef3c7",
                     fontSize: "0.85rem",
                   }}
                 >

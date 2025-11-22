@@ -2,6 +2,7 @@ import json
 import os
 from uuid import uuid4
 from typing import Dict, Any, Optional
+from google.oauth2.credentials import Credentials
 
 DATA_DIR = os.path.dirname(__file__)
 DB_PATH = os.path.join(DATA_DIR, "db.json")
@@ -9,6 +10,7 @@ DB_PATH = os.path.join(DATA_DIR, "db.json")
 # in-memory mirrors
 USERS: Dict[str, Dict[str, Any]] = {}
 PROFILES: Dict[str, Dict[str, Any]] = {}
+TOKENS: Dict[str, Dict[str, Any]] = {}
 
 
 def _load_db() -> None:
@@ -29,6 +31,7 @@ def _load_db() -> None:
 
     USERS = data.get("users", {})
     PROFILES = data.get("profiles", {})
+    TOKENS = data.get("tokens", {}) 
 
 
 def _save_db() -> None:
@@ -36,6 +39,7 @@ def _save_db() -> None:
     data = {
         "users": USERS,
         "profiles": PROFILES,
+        "tokens": TOKENS,
     }
     with open(DB_PATH, "w", encoding="utf-8") as f:
         json.dump(data, f, ensure_ascii=False, indent=2)
@@ -94,4 +98,25 @@ def save_profile(
     PROFILES[user_id] = profile
     _save_db()
     return profile
+
+def save_google_tokens(user_id: str, creds: Credentials) -> None:
+    """
+    Store Google OAuth tokens for this user in db.json.
+    Called from the /api/google/oauth2callback handler.
+    """
+    # creds.to_json() -> JSON string; parse it so we store a dict
+    TOKENS[user_id] = json.loads(creds.to_json())
+    _save_db()
+
+
+def load_google_credentials(user_id: str) -> Optional[Credentials]:
+    """
+    Load Google OAuth tokens for this user from db.json and build Credentials.
+    Used when calling the Google Calendar API.
+    """
+    token_info = TOKENS.get(user_id)
+    if not token_info:
+        return None
+    return Credentials.from_authorized_user_info(token_info)
+
 
