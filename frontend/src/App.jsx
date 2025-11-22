@@ -40,6 +40,7 @@ function App() {
     <div
       style={{
         minHeight: "100vh",
+        width: "100%",
         display: "flex",
         alignItems: "center",
         justifyContent: "center",
@@ -47,11 +48,11 @@ function App() {
         color: "#0f172a",
       }}
     >
-      <div style={{ width: "100%", maxWidth: 480, padding: 24 }}>
+      <div style={{ width: "100%", maxWidth: 48000, padding: 24 }}>
         {step === "intro" && (
           <IntroPage
-            onFirstTime={handleFirstTime}
-            onReturning={handleReturningUser}
+          onFirstTime={handleFirstTime}
+          onReturning={handleReturningUser}
           />
         )}
         {step === "onboarding-choice" && (
