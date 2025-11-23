@@ -8,11 +8,31 @@ import FloUploadPage from "./pages/FloUploadPage";
 import LoginPage from "./pages/LoginPage";
 import MonthlyQuizPage from "./pages/MonthlyQuizPage";
 import DashboardPage from "./pages/DashboardPage";
+import PlanEventPage from "./pages/PlanEventPage";
+import WeeklyQuizPage from "./pages/WeeklyQuizPage";
+
+
 
 function App() {
   const [step, setStep] = useState("intro");
   const [user, setUser] = useState(null);
   const [calendarConnected, setCalendarConnected] = useState(false);
+
+  const fetchCalendarStatus = async (u) => {
+  const uid = u?.userId;
+  if (!uid) return;
+
+  try {
+    const res = await fetch(
+      `http://localhost:8000/api/user/${uid}/calendar-status`
+    );
+    if (!res.ok) return;
+    const data = await res.json();
+    setCalendarConnected(data.connected);
+  } catch (e) {
+    console.error("calendar status error", e);
+  }
+};
 
   // Load user + calendar connection flag after reload / Google redirect
   useEffect(() => {
@@ -21,6 +41,7 @@ function App() {
       try {
         const parsed = JSON.parse(stored);
         setUser(parsed);
+        fetchCalendarStatus(parsed);
       } catch (e) {
         console.error("Failed to parse stored user", e);
       }
@@ -107,6 +128,7 @@ function App() {
     }
   };
 
+
   // -------- returning user flow --------
 
   const handleReturningUser = () => {
@@ -118,11 +140,21 @@ function App() {
     setUser(userData);
     setCalendarConnected(false); // or true later if you persist it
     setStep("dashboard");
+    fetchCalendarStatus(userData);
   };
 
   const handleMonthlyQuizComplete = () => {
     setStep("dashboard");
   };
+
+  const handleWeeklyQuizComplete = () => {
+    setStep("dashboard");
+  };
+
+  const handleOpenWeeklyQuiz = () => {
+  setStep("weekly-quiz");
+};
+
 
   // -------- Google Calendar connection --------
 
@@ -151,6 +183,11 @@ function App() {
       alert("Could not start Google connection");
     }
   };
+
+  const handleOpenPlanEvent = () => {
+  setStep("plan-event");
+};
+
 
   // -------- render step machine --------
 
@@ -202,11 +239,11 @@ function App() {
         />
       )}
 
-      {step === "monthly-quiz" && (
-        <MonthlyQuizPage
+      {step === "weekly-quiz" && (
+        <WeeklyQuizPage
           user={user}
-          onComplete={handleMonthlyQuizComplete}
-          onSkip={() => setStep("dashboard")}
+          onComplete={handleWeeklyQuizComplete}
+          onBack={() => setStep("dashboard")}
         />
       )}
 
@@ -215,8 +252,17 @@ function App() {
           user={user}
           calendarConnected={calendarConnected}
           onConnectCalendar={handleConnectCalendar}
+          onOpenPlanEvent={handleOpenPlanEvent}
+          onOpenWeeklyQuiz={handleOpenWeeklyQuiz}
         />
       )}
+      {step === "plan-event" && (
+  <PlanEventPage
+    user={user}
+    onBack={() => setStep("dashboard")}
+  />
+)}
+
     </>
   );
 }

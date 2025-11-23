@@ -1,11 +1,19 @@
 /* ---------- Global base styles ---------- */
 
+.intro-logo {
+  width: 1000px;           /* tweak this size if needed */
+  max-width: 80%;
+  display: block;
+  margin: 0 auto 1.5rem;  /* center + space below */
+}
+
+
 :root {
   font-family: system-ui, -apple-system, BlinkMacSystemFont, "SF Pro Text",
     "Helvetica Neue", Avenir, Helvetica, Arial, sans-serif;
   line-height: 1.5;
   font-weight: 400;
-  color: #0f172a;
+  color: #a698ee;
   background-color: #ffffff;
   font-synthesis: none;
   text-rendering: optimizeLegibility;
@@ -59,7 +67,7 @@ a:hover {
   font-size: 2.5rem;
   font-weight: 600;
   letter-spacing: 0.04em;
-  color: #0f172a;
+  color: #a698ee;
   margin: 0 0 0.5rem 0;
 }
 
@@ -86,7 +94,7 @@ a:hover {
   display: block;
   font-size: 0.85rem;
   font-weight: 500;
-  color: #0f172a;
+  color: #a698ee;
   margin-bottom: 0.35rem;
 }
 
@@ -135,17 +143,17 @@ a:hover {
 }
 
 .btn-primary {
-  background-color: #111827;
+  background-color: #a698ee;
   color: #ffffff;
 }
 
 .btn-primary:hover {
-  background-color: #000000;
+  background-color: #a698ee;
 }
 
 .btn-secondary {
   background-color: #ffffff;
-  color: #111827;
+  color: #a698ee;
   border: 1px solid #e5e7eb;
 }
 
@@ -202,7 +210,7 @@ a:hover {
   padding: 0.4rem 0.9rem;
   font-size: 0.85rem;
   background-color: #ffffff;
-  color: #111827;
+  color: #a698ee;
   cursor: pointer;
   transition:
     background-color 0.15s ease,
@@ -221,13 +229,13 @@ a:hover {
 
 .quiz-chip:hover {
   transform: translateY(-1px);
-  box-shadow: 0 8px 20px rgba(15, 23, 42, 0.06);
+  box-shadow: 0 8px 20px #a698ee;
 }
 
 .quiz-chip-selected {
-  background-color: #111827;
+  background-color: #a698ee;
   color: #ffffff;
-  border-color: #111827;
+  border-color: #a698ee;
 }
 
 .quiz-slider-container {
@@ -236,7 +244,7 @@ a:hover {
 
 .quiz-slider {
   width: 100%;
-  accent-color: #111827;
+  accent-color: #a698ee;
 }
 
 .quiz-slider-labels {
@@ -246,4 +254,34 @@ a:hover {
   color: #9ca3af;
   margin-top: 0.25rem;
 }
+
+.symptom-box {
+  padding: 0.5rem 0.9rem;
+  border-radius: 999px;
+  border: 1px solid #e5e7eb;
+  background-color: #ffffff;
+  color: #111827;
+  font-size: 0.85rem;
+  cursor: pointer;
+  transition:
+    background-color 0.15s ease,
+    color 0.15s ease,
+    box-shadow 0.15s ease,
+    border-color 0.15s ease,
+    transform 0.1s ease;
+  box-shadow: 0 6px 15px rgba(15, 23, 42, 0.08);
+}
+
+.symptom-box.selected:hover {
+  box-shadow: 0 12px 30px rgba(166, 152, 238, 0.45);
+}
+
+
+.symptom-box.selected {
+  background-color: #a698ee;   /* selected color */
+  color: #ffffff;              /* keep text white for contrast */
+  border-color: #a698ee;
+}
+
+
 

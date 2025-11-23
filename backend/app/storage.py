@@ -2,6 +2,7 @@ import json
 import os
 from uuid import uuid4
 from typing import Dict, Any, Optional
+
 from google.oauth2.credentials import Credentials
 
 DATA_DIR = os.path.dirname(__file__)
@@ -14,11 +15,15 @@ TOKENS: Dict[str, Dict[str, Any]] = {}
 
 
 def _load_db() -> None:
-    """Load USERS and PROFILES from db.json if it exists."""
-    global USERS, PROFILES
+    """
+    Load USERS, PROFILES and TOKENS from db.json if it exists.
+    """
+    global USERS, PROFILES, TOKENS
+
     if not os.path.exists(DB_PATH):
         USERS = {}
         PROFILES = {}
+        TOKENS = {}
         return
 
     try:
@@ -27,15 +32,18 @@ def _load_db() -> None:
     except Exception:
         USERS = {}
         PROFILES = {}
+        TOKENS = {}
         return
 
     USERS = data.get("users", {})
     PROFILES = data.get("profiles", {})
-    TOKENS = data.get("tokens", {}) 
+    TOKENS = data.get("tokens", {})  # <-- this was never global before
 
 
 def _save_db() -> None:
-    """Persist USERS and PROFILES to db.json."""
+    """
+    Persist USERS, PROFILES and TOKENS to db.json.
+    """
     data = {
         "users": USERS,
         "profiles": PROFILES,
@@ -99,12 +107,12 @@ def save_profile(
     _save_db()
     return profile
 
+
 def save_google_tokens(user_id: str, creds: Credentials) -> None:
     """
     Store Google OAuth tokens for this user in db.json.
     Called from the /api/google/oauth2callback handler.
     """
-    # creds.to_json() -> JSON string; parse it so we store a dict
     TOKENS[user_id] = json.loads(creds.to_json())
     _save_db()
 
@@ -119,4 +127,28 @@ def load_google_credentials(user_id: str) -> Optional[Credentials]:
         return None
     return Credentials.from_authorized_user_info(token_info)
 
+def save_weekly_quiz(
+    user_id: str,
+    *,
+    stress: int,
+    concentration: int,
+    energy: int,
+    workout: int,
+    social: int,
+) -> Dict[str, Any]:
+    """
+    Store the latest weekly quiz answers on the user's profile
+    under the key 'weekly_quiz'.
+    """
+    profile = PROFILES.get(user_id) or {"user_id": user_id}
+    profile["weekly_quiz"] = {
+        "stress": stress,
+        "concentration": concentration,
+        "energy": energy,
+        "workout": workout,
+        "social": social,
+    }
+    PROFILES[user_id] = profile
+    _save_db()
+    return profile["weekly_quiz"]
 

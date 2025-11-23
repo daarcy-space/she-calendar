@@ -1,5 +1,7 @@
 from datetime import date, timedelta
-from typing import Dict, List
+from typing import Dict, List, Any, Optional
+
+from .storage import PROFILES
 
 
 def get_cycle_day(today: date, last_period_start: date, cycle_length: int) -> int:
@@ -112,3 +114,34 @@ def get_phase_tips(phase: str) -> Dict[str, List[str] or str]:
             "avoid": [],
         },
     )
+
+def get_cycle_summary(user_id: str) -> Dict[str, Any]:
+    """
+    Compute current cycle day, phase label and tips for a given user_id.
+    Used by both the /cycle-summary endpoint and the AI agent.
+    """
+    profile = PROFILES.get(user_id)
+    if not profile:
+        raise ValueError("Profile not found for user")
+
+    last_period_raw = profile["last_period_start"]
+    if isinstance(last_period_raw, str):
+        last_period_start = date.fromisoformat(last_period_raw)
+    else:
+        last_period_start = last_period_raw  # already a date
+
+    cycle_length = int(profile["cycle_length"])
+    bleed_days = int(profile["menstruation_phase_duration"])
+
+    today = date.today()
+    days_since = (today - last_period_start).days
+    cycle_day = (days_since % cycle_length) + 1
+
+    phase_label = get_phase(cycle_day, cycle_length, bleed_days)
+    tips = get_phase_tips(phase_label)
+
+    return {
+      "cycle_day": cycle_day,
+      "phase_label": phase_label,
+      "tips": tips,
+    }

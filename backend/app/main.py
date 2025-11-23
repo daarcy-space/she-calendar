@@ -1,13 +1,20 @@
 from datetime import date, datetime, timedelta
-from typing import Any, Dict
+from typing import Any, Dict, List  # <-- added List
+
+
 from .google_auth import build_flow
 from googleapiclient.discovery import build
 from google.oauth2.credentials import Credentials
+from googleapiclient.errors import HttpError
 from urllib.parse import urlencode
 
 from fastapi import FastAPI, HTTPException, Request
 from fastapi.responses import RedirectResponse
 from fastapi.middleware.cors import CORSMiddleware
+
+from .agent import run_planner_agent
+from .planning_rules import category_target_phases
+
 
 from .models import (
     RegisterRequest,
@@ -21,6 +28,15 @@ from .models import (
     PlanEvaluateRequest,
     PlanEvaluateResponse,
     TaskPlanSuggestion,
+    CalendarStatusResponse,
+    AgentPlanWeekResponse,
+    AgentSuggestion,
+    MoveEventRequest,
+    MoveEventResponse,
+    CreateEventRequest,
+    CreateEventResponse,
+    WeeklyQuizInput,
+    WeeklyQuizResponse,
 )
 from .storage import (
     USERS,
@@ -30,6 +46,7 @@ from .storage import (
     save_profile,
     save_google_tokens,
     load_google_credentials,
+    save_weekly_quiz,
 )
 from .phase_engine import (
     get_cycle_day,
@@ -40,10 +57,9 @@ from .phase_engine import (
 
 app = FastAPI(title="she.Calendar API")
 
-# --- CORS so frontend (Vite) can talk to backend on localhost ---
-
 REDIRECT_URI = "http://localhost:8000/api/google/oauth2callback"
 
+# --- CORS so frontend (Vite) can talk to backend on localhost ---
 app.add_middleware(
     CORSMiddleware,
     allow_origins=[
@@ -54,7 +70,6 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
-
 
 # ---------- AUTH ----------
 
@@ -142,6 +157,35 @@ def save_quiz_profile(payload: QuizProfileInput) -> QuizProfileResponse:
         workout_intensity=profile["workout_intensity"],
     )
 
+@app.post("/api/profile/weekly-quiz", response_model=WeeklyQuizResponse)
+def save_weekly_quiz_endpoint(payload: WeeklyQuizInput) -> WeeklyQuizResponse:
+    """
+    Save the weekly check-in (stress, energy, symptoms, etc.)
+    so the agent can adjust its suggestions.
+    """
+    user_id = payload.user_id
+    if user_id not in USERS:
+        raise HTTPException(status_code=404, detail="User not found")
+
+    data = save_weekly_quiz(
+        user_id=user_id,
+        stress=payload.stress,
+        concentration=payload.concentration,
+        energy=payload.energy,
+        workout=payload.workout,
+        social=payload.social,
+    )
+
+    return WeeklyQuizResponse(
+        user_id=user_id,
+        stress=data["stress"],
+        concentration=data["concentration"],
+        energy=data["energy"],
+        workout=data["workout"],
+        social=data["social"],
+    )
+
+
 
 # ---------- CYCLE SUMMARY FOR DASHBOARD ----------
 
@@ -167,7 +211,9 @@ def get_cycle_summary(user_id: str) -> CycleSummaryResponse:
             else lps_raw
         )
     except Exception:
-        raise HTTPException(status_code=400, detail="Invalid last_period_start in profile")
+        raise HTTPException(
+            status_code=400, detail="Invalid last_period_start in profile"
+        )
 
     cycle_length = profile.get("cycle_length", 28)
     bleed_days = profile.get("menstruation_phase_duration", 5)
@@ -194,18 +240,19 @@ def get_cycle_summary(user_id: str) -> CycleSummaryResponse:
     )
 
 
-# ---------- PLANNING EVALUATION ----------
+@app.get("/api/user/{user_id}/calendar-status", response_model=CalendarStatusResponse)
+def calendar_status(user_id: str) -> CalendarStatusResponse:
+    """
+    Check if this user has Google Calendar tokens stored.
+    """
+    if user_id not in USERS:
+        raise HTTPException(status_code=404, detail="User not found")
 
-def _category_target_phases(category: str):
-    category = category.lower()
-    if category in {"social", "dating", "networking"}:
-        return ["follicular", "ovulation"]
-    if category in {"work", "uni", "study", "deep_work"}:
-        return ["follicular", "ovulation", "luteal"]
-    if category in {"selfcare", "rest"}:
-        return ["menstrual", "luteal"]
-    # default: accept all phases
-    return ["menstrual", "follicular", "ovulation", "luteal"]
+    creds = load_google_credentials(user_id)
+    return CalendarStatusResponse(user_id=user_id, connected=bool(creds))
+
+
+# ---------- PLANNING EVALUATION ----------
 
 
 @app.post("/api/plan/evaluate", response_model=PlanEvaluateResponse)
@@ -231,7 +278,9 @@ def evaluate_plan(payload: PlanEvaluateRequest) -> PlanEvaluateResponse:
             else lps_raw
         )
     except Exception:
-        raise HTTPException(status_code=400, detail="Invalid last_period_start in profile")
+        raise HTTPException(
+            status_code=400, detail="Invalid last_period_start in profile"
+        )
 
     cycle_length = profile.get("cycle_length", 28)
     bleed_days = profile.get("menstruation_phase_duration", 5)
@@ -239,15 +288,20 @@ def evaluate_plan(payload: PlanEvaluateRequest) -> PlanEvaluateResponse:
     suggestions = []
 
     for task in payload.tasks:
+        raw = task.start_iso
+        if raw.endswith("Z"):
+            raw = raw.replace("Z", "+00:00")
         try:
-            start_dt = datetime.fromisoformat(task.start_iso)
+            start_dt = datetime.fromisoformat(raw)
         except ValueError:
-            raise HTTPException(status_code=400, detail=f"Invalid datetime: {task.start_iso}")
+            raise HTTPException(
+                status_code=400, detail=f"Invalid datetime: {task.start_iso}"
+            )
 
         cycle_day = get_cycle_day(start_dt.date(), last_period_start, cycle_length)
         phase = get_phase(cycle_day, cycle_length, bleed_days)
 
-        target_phases = _category_target_phases(task.category)
+        target_phases = category_target_phases(task.category)
         is_ideal = phase in target_phases
 
         if is_ideal:
@@ -269,8 +323,12 @@ def evaluate_plan(payload: PlanEvaluateRequest) -> PlanEvaluateResponse:
         best_phase = None
         for delta_days in range(-3, 8):
             candidate_date = start_dt.date() + timedelta(days=delta_days)
-            candidate_cycle_day = get_cycle_day(candidate_date, last_period_start, cycle_length)
-            candidate_phase = get_phase(candidate_cycle_day, cycle_length, bleed_days)
+            candidate_cycle_day = get_cycle_day(
+                candidate_date, last_period_start, cycle_length
+            )
+            candidate_phase = get_phase(
+                candidate_cycle_day, cycle_length, bleed_days
+            )
             if candidate_phase in target_phases:
                 best_dt = datetime.combine(candidate_date, start_dt.time())
                 best_phase = candidate_phase
@@ -324,6 +382,8 @@ def debug_profiles() -> Dict[str, Any]:
     return PROFILES
 
 
+# ---------- GOOGLE OAUTH ----------
+
 @app.get("/api/google/auth-url")
 def get_google_auth_url(user_id: str):
     """
@@ -340,12 +400,11 @@ def get_google_auth_url(user_id: str):
             access_type="offline",
             include_granted_scopes="true",
             prompt="consent",
-            state=user_id,
+            state=user_id,  # we round-trip user_id via `state`
         )
 
         return {"auth_url": auth_url}
     except Exception as e:
-        # TEMP: surface the real error instead of silent 500
         raise HTTPException(
             status_code=500,
             detail=f"google_auth_url_error: {e}",
@@ -378,4 +437,169 @@ def google_oauth_callback(request: Request):
         )
 
     return RedirectResponse("http://localhost:5173/?connected=1")
+
+
+# ---------- AGENT ----------
+
+@app.post("/api/agent/plan-week", response_model=AgentPlanWeekResponse)
+def agent_plan_week(user_id: str) -> AgentPlanWeekResponse:
+    """
+    Ask the AI agent to analyse next week's events for this user.
+    """
+    if user_id not in USERS:
+        raise HTTPException(status_code=404, detail="User not found")
+
+    try:
+        suggestions = run_planner_agent(user_id)
+    except RuntimeError as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+    # Basic validation/truncation for safety
+    cleaned: List[AgentSuggestion] = []
+    for s in suggestions:
+        cleaned.append(
+            AgentSuggestion(
+                event_id=s["event_id"],
+                event_title=s.get("event_title", "(no title)"),
+                action=s["action"],
+                new_start=s.get("new_start"),
+                new_end=s.get("new_end"),
+                reason=s.get("reason", ""),
+            )
+        )
+
+    return AgentPlanWeekResponse(user_id=user_id, suggestions=cleaned)
+
+@app.post("/api/calendar/move-event", response_model=MoveEventResponse)
+def calendar_move_event(payload: MoveEventRequest) -> MoveEventResponse:
+    """
+    Move a single Google Calendar event to a new start/end time.
+    Used when the user confirms one agent suggestion.
+    """
+    user_id = payload.user_id
+    if user_id not in USERS:
+        raise HTTPException(status_code=404, detail="User not found")
+
+    creds = load_google_credentials(user_id)
+    if not creds:
+        raise HTTPException(
+            status_code=400,
+            detail="Google Calendar is not connected for this user",
+        )
+
+    service = build("calendar", "v3", credentials=creds)
+
+    try:
+        # fetch the event
+        event = (
+            service.events()
+            .get(calendarId="primary", eventId=payload.event_id)
+            .execute()
+        )
+    except HttpError as e:
+        raise HTTPException(
+            status_code=404,
+            detail=f"Event not found in Google Calendar: {e}",
+        )
+
+    # Keep existing timezone if possible
+    start_info = event.get("start", {})
+    end_info = event.get("end", {})
+    tz = (
+        start_info.get("timeZone")
+        or end_info.get("timeZone")
+        or "UTC"
+    )
+
+    # Overwrite start/end as timed events
+    event["start"] = {
+        "dateTime": payload.new_start_iso,
+        "timeZone": tz,
+    }
+    event["end"] = {
+        "dateTime": payload.new_end_iso,
+        "timeZone": tz,
+    }
+
+    # Update on Google Calendar
+    try:
+        updated = (
+            service.events()
+            .update(calendarId="primary", eventId=payload.event_id, body=event)
+            .execute()
+        )
+    except HttpError as e:
+        raise HTTPException(
+            status_code=500,
+            detail=f"Failed to update event: {e}",
+        )
+
+    new_start = updated["start"].get("dateTime") or updated["start"].get("date")
+    new_end = updated["end"].get("dateTime") or updated["end"].get("date")
+
+    return MoveEventResponse(
+        success=True,
+        event_id=payload.event_id,
+        new_start_iso=new_start,
+        new_end_iso=new_end,
+    )
+
+
+@app.post("/api/calendar/create-event", response_model=CreateEventResponse)
+def calendar_create_event(payload: CreateEventRequest) -> CreateEventResponse:
+    """
+    Create a new Google Calendar event at the chosen time.
+    Used after the agent suggests a good slot for a planned event.
+    """
+    user_id = payload.user_id
+    if user_id not in USERS:
+        raise HTTPException(status_code=404, detail="User not found")
+
+    creds = load_google_credentials(user_id)
+    if not creds:
+        raise HTTPException(
+            status_code=400,
+            detail="Google Calendar is not connected for this user",
+        )
+
+    service = build("calendar", "v3", credentials=creds)
+
+    # For demo, assume Europe/Berlin, you can change if you want
+    tz = "Europe/Berlin"
+
+    event_body = {
+        "summary": payload.title,
+        "description": payload.description or "Created via she.Calendar",
+        "start": {
+            "dateTime": payload.start_iso,
+            "timeZone": tz,
+        },
+        "end": {
+            "dateTime": payload.end_iso,
+            "timeZone": tz,
+        },
+    }
+
+    try:
+        created = (
+            service.events()
+            .insert(calendarId="primary", body=event_body)
+            .execute()
+        )
+    except HttpError as e:
+        raise HTTPException(
+            status_code=500,
+            detail=f"Failed to create event: {e}",
+        )
+
+    start = created["start"].get("dateTime") or created["start"].get("date")
+    end = created["end"].get("dateTime") or created["end"].get("date")
+
+    return CreateEventResponse(
+        success=True,
+        event_id=created["id"],
+        html_link=created.get("htmlLink"),
+        start_iso=start,
+        end_iso=end,
+    )
 

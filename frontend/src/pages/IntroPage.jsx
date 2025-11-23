@@ -1,8 +1,14 @@
+import sheLogo from "../assets/shelogo.png";
+
 function IntroPage({ onFirstTime, onReturning }) {
   return (
     <div className="screen-root">
       <div className="screen-card">
-        <h1 className="screen-title">she.Calendar</h1>
+        <img
+  src={sheLogo}
+  alt="she.Calendar – AI calendar for women"
+  className="intro-logo"
+/>
         <p className="screen-subtitle">
           An AI agent that syncs your calendar with your cycle.
         </p>

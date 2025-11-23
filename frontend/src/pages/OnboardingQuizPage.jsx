@@ -1,269 +1,348 @@
 import { useState } from "react";
 
 function OnboardingQuizPage({ onComplete, onBack }) {
-  const [step, setStep] = useState(0);
+  const [step, setStep] = useState(1);
 
-  const [bleedDays, setBleedDays] = useState(""); // int
-  const [cycleLength, setCycleLength] = useState(""); // int
-  const [symptoms, setSymptoms] = useState([]); // string[]
-  const [medication, setMedication] = useState(""); // string
-  const [activitySlider, setActivitySlider] = useState(2); // 1..3
-  const [activity, setActivity] = useState("medium"); // "low" | "medium" | "high"
+  const [lastPeriodStart, setLastPeriodStart] = useState("");
+  const [bleedDays, setBleedDays] = useState("");
+  const [cycleLength, setCycleLength] = useState("");
+  const [symptoms, setSymptoms] = useState([]);
+  const [medication, setMedication] = useState("");
+  const [activity, setActivity] = useState("medium");
 
   const symptomOptions = [
     "Cramps",
     "Headache",
     "Back pain",
     "Bloating",
-    "Fatigue",
     "Mood swings",
-    "Breast tenderness",
     "Nausea",
+    "Tender breasts",
+    "Acne",
+    "Fatigue",
+    "Insomnia",
   ];
 
-  const totalSteps = 5;
-
-  const sliderToLabel = (val) => {
-    if (val === 1) return "low";
-    if (val === 2) return "medium";
-    return "high";
-  };
-
-  const toggleSymptom = (symptom) => {
+  const toggleSymptom = (s) => {
     setSymptoms((prev) =>
-      prev.includes(symptom)
-        ? prev.filter((s) => s !== symptom)
-        : [...prev, symptom]
+      prev.includes(s) ? prev.filter((x) => x !== s) : [...prev, s]
     );
   };
 
-  const handleNext = () => {
-    if (step < totalSteps - 1) setStep((s) => s + 1);
-  };
-
-  const handlePrev = () => {
-    if (step === 0) onBack();
-    else setStep((s) => s - 1);
-  };
+  const next = () => setStep((s) => s + 1);
+  const prev = () => setStep((s) => s - 1);
 
   const handleFinish = (e) => {
-  e.preventDefault();
+    e.preventDefault();
 
-  onComplete({
-    menstruation_phase_duration: bleedDays ? Number(bleedDays) : null,
-    cycle_length: cycleLength ? Number(cycleLength) : null,
-    symptoms,
-    medication: medication.trim(),
-    workout_intensity: activity,
-    last_period_start: new Date().toISOString().slice(0, 10), // or a real date question
-  });
-};
+    if (!lastPeriodStart) {
+      alert("Please tell us when your last period started.");
+      setStep(1);
+      return;
+    }
 
+    onComplete({
+      last_period_start: lastPeriodStart, // "YYYY-MM-DD"
+      menstruation_phase_duration: bleedDays ? Number(bleedDays) : null,
+      cycle_length: cycleLength ? Number(cycleLength) : null,
+      symptoms,
+      medication: medication.trim(),
+      workout_intensity: activity,
+    });
+  };
 
-  const renderStep = () => {
-    switch (step) {
-      case 0:
-        return (
-          <>
-            <h2 className="screen-title" style={{ fontSize: "1.6rem" }}>
-              Let&apos;s get to know your cycle
+  const StepLabel = ({ current }) => (
+    <p
+      className="screen-subtitle"
+      style={{ textAlign: "right", fontSize: "0.8rem" }}
+    >
+      Step {current} of 6
+    </p>
+  );
+
+  return (
+    <div className="screen-root">
+      <div className="screen-card">
+        <button className="btn-ghost" type="button" onClick={onBack}>
+          ← Back
+        </button>
+
+        {/* STEP 1: last period start */}
+        {step === 1 && (
+          <form
+            onSubmit={(e) => {
+              e.preventDefault();
+              next();
+            }}
+          >
+            <StepLabel current={1} />
+            <h2 className="screen-title" style={{ marginTop: "0.5rem" }}>
+              When did your last period start?
             </h2>
             <p className="screen-subtitle">
-              We&apos;ll use this once to build your base pattern. You can
-              always update it later.
+              This helps she.Calendar calculate which day of your cycle you are
+              on today.
             </p>
 
-            <div className="screen-field" style={{ marginTop: "2rem" }}>
-              <label className="screen-label">
-                How many days does your bleeding usually last?
-              </label>
+            <div className="screen-field" style={{ marginTop: "1.75rem" }}>
+              <label className="screen-label">Start date</label>
+              <input
+                type="date"
+                className="screen-input"
+                value={lastPeriodStart}
+                onChange={(e) => setLastPeriodStart(e.target.value)}
+                required
+              />
+            </div>
+
+            <div className="screen-actions" style={{ marginTop: "2rem" }}>
+              <button className="btn btn-primary" type="submit">
+                Next
+              </button>
+            </div>
+          </form>
+        )}
+
+        {/* STEP 2: menstruation phase duration */}
+        {step === 2 && (
+          <form
+            onSubmit={(e) => {
+              e.preventDefault();
+              next();
+            }}
+          >
+            <StepLabel current={2} />
+            <h2 className="screen-title" style={{ marginTop: "0.5rem" }}>
+              How long does your bleed usually last?
+            </h2>
+            <p className="screen-subtitle">
+              Most periods are between 3 and 7 days. It&apos;s fine to estimate.
+            </p>
+
+            <div className="screen-field" style={{ marginTop: "1.75rem" }}>
+              <label className="screen-label">Days of bleeding</label>
               <input
                 type="number"
-                min={3}
-                max={7}
-                placeholder="Most people: 3–7 days"
+                min={1}
+                max={10}
                 className="screen-input"
+                placeholder="For example, 5"
                 value={bleedDays}
                 onChange={(e) => setBleedDays(e.target.value)}
+                required
               />
             </div>
-          </>
-        );
 
-      case 1:
-        return (
-          <>
-            <h2 className="screen-title" style={{ fontSize: "1.6rem" }}>
-              How long is your whole cycle?
+            <div className="screen-actions" style={{ marginTop: "2rem" }}>
+              <button className="btn-ghost" type="button" onClick={prev}>
+                ← Previous
+              </button>
+              <button className="btn btn-primary" type="submit">
+                Next
+              </button>
+            </div>
+          </form>
+        )}
+
+        {/* STEP 3: cycle length */}
+        {step === 3 && (
+          <form
+            onSubmit={(e) => {
+              e.preventDefault();
+              next();
+            }}
+          >
+            <StepLabel current={3} />
+            <h2 className="screen-title" style={{ marginTop: "0.5rem" }}>
+              How long is your full cycle?
             </h2>
             <p className="screen-subtitle">
-              From day 1 of one period to day 1 of the next.
+              The classic number is 28 days, but anything between ~21–35 can be
+              normal for adults.
             </p>
 
-            <div className="screen-field" style={{ marginTop: "2rem" }}>
-              <label className="screen-label">
-                Typical cycle length (in days)
-              </label>
+            <div className="screen-field" style={{ marginTop: "1.75rem" }}>
+              <label className="screen-label">Cycle length in days</label>
               <input
                 type="number"
-                min={21}
+                min={18}
                 max={40}
-                placeholder="Around 28 days for many, but your normal is what matters."
                 className="screen-input"
+                placeholder="For example, 28"
                 value={cycleLength}
                 onChange={(e) => setCycleLength(e.target.value)}
+                required
               />
             </div>
-          </>
-        );
 
-      case 2:
-        return (
-          <>
-            <h2 className="screen-title" style={{ fontSize: "1.6rem" }}>
-              How does your period usually feel?
+            <div className="screen-actions" style={{ marginTop: "2rem" }}>
+              <button className="btn-ghost" type="button" onClick={prev}>
+                ← Previous
+              </button>
+              <button className="btn btn-primary" type="submit">
+                Next
+              </button>
+            </div>
+          </form>
+        )}
+
+        {/* STEP 4: symptoms */}
+        {step === 4 && (
+          <form
+            onSubmit={(e) => {
+              e.preventDefault();
+              next();
+            }}
+          >
+            <StepLabel current={4} />
+            <h2 className="screen-title" style={{ marginTop: "0.5rem" }}>
+              What do you usually feel during your period?
             </h2>
             <p className="screen-subtitle">
-              Pick the symptoms that show up most cycles. You can choose more than one.
+              Pick everything that sounds familiar. You can always change this
+              later.
             </p>
 
-            <div className="quiz-options">
+            <div
+              style={{
+                display: "flex",
+                flexWrap: "wrap",
+                gap: "0.5rem",
+                marginTop: "1.75rem",
+              }}
+            >
               {symptomOptions.map((s) => {
-                const selected = symptoms.includes(s);
+                const active = symptoms.includes(s);
                 return (
                   <button
                     key={s}
                     type="button"
+                    className="chip-btn"
+                    style={{
+                      padding: "0.5rem 0.9rem",
+                      borderRadius: "999px",
+                      border: active
+                        ? "1px solid #a698ee"
+                        : "1px solid #e5e7eb",
+                      backgroundColor: active ? "#a698ee" : "#ffffff",
+                      color: active ? "#ffffff" : "#111827",
+                      fontSize: "0.8rem",
+                    }}
                     onClick={() => toggleSymptom(s)}
-                    className={
-                      "quiz-chip" + (selected ? " quiz-chip-selected" : "")
-                    }
                   >
                     {s}
                   </button>
                 );
               })}
             </div>
-          </>
-        );
 
-      case 3:
-        return (
-          <>
-            <h2 className="screen-title" style={{ fontSize: "1.6rem" }}>
-              Do you usually take anything to help?
+            <div className="screen-actions" style={{ marginTop: "2rem" }}>
+              <button className="btn-ghost" type="button" onClick={prev}>
+                ← Previous
+              </button>
+              <button className="btn btn-primary" type="submit">
+                Next
+              </button>
+            </div>
+          </form>
+        )}
+
+        {/* STEP 5: medication */}
+        {step === 5 && (
+          <form
+            onSubmit={(e) => {
+              e.preventDefault();
+              next();
+            }}
+          >
+            <StepLabel current={5} />
+            <h2 className="screen-title" style={{ marginTop: "0.5rem" }}>
+              Do you usually take anything for your symptoms?
             </h2>
             <p className="screen-subtitle">
-              Painkillers, birth control, herbal remedies… whatever you feel comfortable sharing.
+              For example: ibuprofen, hormonal contraception, or &quot;nothing
+              special&quot;.
             </p>
 
-            <div className="screen-field" style={{ marginTop: "2rem" }}>
-              <label className="screen-label">
-                Medication or support during your period
-              </label>
-              <textarea
-                className="screen-textarea"
-                placeholder="E.g. ibuprofen on day 1, heating pad, hormonal birth control, etc."
+            <div className="screen-field" style={{ marginTop: "1.75rem" }}>
+              <label className="screen-label">Your answer</label>
+              <input
+                className="screen-input"
+                placeholder="Optional — you can keep it short"
                 value={medication}
                 onChange={(e) => setMedication(e.target.value)}
               />
             </div>
-          </>
-        );
 
-      case 4:
-        return (
-          <>
-            <h2 className="screen-title" style={{ fontSize: "1.6rem" }}>
+            <div className="screen-actions" style={{ marginTop: "2rem" }}>
+              <button className="btn-ghost" type="button" onClick={prev}>
+                ← Previous
+              </button>
+              <button className="btn btn-primary" type="submit">
+                Next
+              </button>
+            </div>
+          </form>
+        )}
+
+        {/* STEP 6: activity slider */}
+        {step === 6 && (
+          <form onSubmit={handleFinish}>
+            <StepLabel current={6} />
+            <h2 className="screen-title" style={{ marginTop: "0.5rem" }}>
               How active is your lifestyle right now?
             </h2>
             <p className="screen-subtitle">
-              Slide to match how your weeks usually feel. This helps us suggest realistic workouts.
+              This helps us suggest realistic workout and rest blocks.
             </p>
 
-            <div className="screen-field" style={{ marginTop: "2rem" }}>
-              <div className="quiz-slider-container">
-                <input
-                  type="range"
-                  min="1"
-                  max="3"
-                  step="1"
-                  value={activitySlider}
-                  onChange={(e) => {
-                    const val = Number(e.target.value);
-                    setActivitySlider(val);
-                    setActivity(sliderToLabel(val));
-                  }}
-                  className="quiz-slider"
-                />
-                <div className="quiz-slider-labels">
-                  <span>Low</span>
-                  <span>Medium</span>
-                  <span>High</span>
-                </div>
-              </div>
-
-              <p
-                className="screen-subtitle"
-                style={{ marginTop: "0.6rem", fontSize: "0.85rem" }}
+            <div style={{ marginTop: "2rem" }}>
+              <input
+                type="range"
+                min="0"
+                max="2"
+                step="1"
+                value={activity === "low" ? 0 : activity === "medium" ? 1 : 2}
+                onChange={(e) => {
+                  const v = Number(e.target.value);
+                  setActivity(v === 0 ? "low" : v === 1 ? "medium" : "high");
+                }}
+                style={{ width: "100%" }}
+              />
+              <div
+                style={{
+                  display: "flex",
+                  justifyContent: "space-between",
+                  fontSize: "0.8rem",
+                  marginTop: "0.35rem",
+                  color: "#6b7280",
+                }}
               >
-                Current selection:{" "}
-                <strong>{sliderToLabel(activitySlider).toUpperCase()}</strong>
+                <span>Low</span>
+                <span>Medium</span>
+                <span>High</span>
+              </div>
+              <p
+                style={{
+                  marginTop: "0.75rem",
+                  fontSize: "0.85rem",
+                }}
+              >
+                Current selection: <strong>{activity.toUpperCase()}</strong>
               </p>
             </div>
-          </>
-        );
 
-      default:
-        return null;
-    }
-  };
-
-  const isNextDisabled =
-    (step === 0 && !bleedDays) || (step === 1 && !cycleLength);
-
-  return (
-    <div className="screen-root">
-      <form
-        className="screen-card quiz-card"
-        onSubmit={step === totalSteps - 1 ? handleFinish : (e) => e.preventDefault()}
-      >
-        <div
-          style={{
-            display: "flex",
-            justifyContent: "space-between",
-            marginBottom: "1rem",
-            fontSize: "0.75rem",
-            color: "#9ca3af",
-          }}
-        >
-          <button type="button" onClick={handlePrev} className="btn-ghost">
-            {step === 0 ? "← Back" : "← Previous"}
-          </button>
-          <span>
-            Step {step + 1} of {totalSteps}
-          </span>
-        </div>
-
-        {renderStep()}
-
-        <div className="screen-actions" style={{ marginTop: "2rem" }}>
-          {step < totalSteps - 1 ? (
-            <button
-              type="button"
-              className="btn btn-primary"
-              onClick={handleNext}
-              disabled={isNextDisabled}
-            >
-              Next
-            </button>
-          ) : (
-            <button type="submit" className="btn btn-primary">
-              Save & go to calendar
-            </button>
-          )}
-        </div>
-      </form>
+            <div className="screen-actions" style={{ marginTop: "2rem" }}>
+              <button className="btn-ghost" type="button" onClick={prev}>
+                ← Previous
+              </button>
+              <button className="btn btn-primary" type="submit">
+                Save &amp; go to calendar
+              </button>
+            </div>
+          </form>
+        )}
+      </div>
     </div>
   );
 }

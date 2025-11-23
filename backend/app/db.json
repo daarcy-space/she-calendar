@@ -11,19 +11,24 @@
     "1547590c-945d-4b13-995a-71aeeedf4d40": {
       "id": "1547590c-945d-4b13-995a-71aeeedf4d40",
       "email": "sophiastefanova@gmail.com"
+    },
+    "9efd7898-22a1-40a1-84b7-38ded8cec4f5": {
+      "id": "9efd7898-22a1-40a1-84b7-38ded8cec4f5",
+      "email": "fake-email@gmail.com"
     }
   },
   "profiles": {
     "f8e99a74-bf5d-4231-96e2-fd61ec2f050a": {
       "user_id": "f8e99a74-bf5d-4231-96e2-fd61ec2f050a",
-      "last_period_start": "2025-11-22",
+      "last_period_start": "2025-11-04",
       "cycle_length": 25,
-      "menstruation_phase_duration": 3,
+      "menstruation_phase_duration": 5,
       "symptoms": [
-        "Fatigue"
+        "Fatigue",
+        "Nausea"
       ],
       "medication": ".",
-      "workout_intensity": "medium"
+      "workout_intensity": "high"
     },
     "b81389f7-1644-4fb5-9fc3-50a2b00b776b": {
       "user_id": "b81389f7-1644-4fb5-9fc3-50a2b00b776b",
@@ -49,12 +54,24 @@
       ],
       "medication": "jhbfkjdsb",
       "workout_intensity": "medium"
+    },
+    "9efd7898-22a1-40a1-84b7-38ded8cec4f5": {
+      "user_id": "9efd7898-22a1-40a1-84b7-38ded8cec4f5",
+      "last_period_start": "2025-11-04",
+      "cycle_length": 25,
+      "menstruation_phase_duration": 5,
+      "symptoms": [
+        "Low energy",
+        "Back pain"
+      ],
+      "medication": "Ibuprofen",
+      "workout_intensity": "low"
     }
   },
   "tokens": {
     "f8e99a74-bf5d-4231-96e2-fd61ec2f050a": {
-      "token": "ya29.a0ATi6K2s77Y97C1zwxI9GK3zG_CezsEBw0Ys4xnYa1IEON8qiyzwLbA0OCk1Rnzl1H0EPtuPe-dpgQBAVf-pb118c5Xe4xrBom8LM8iXV7RKdFRjTon6hU6vjFl8sQ3K_EEQXfnDVFKjUQBsnO77HyQsnMK5u73dMKoPaol0D7eInTNnZVtAZrtokisR9bsHpn2P6EagaCgYKAY8SARcSFQHGX2MiNHbFc4wteomZID0bIiJgVQ0206",
-      "refresh_token": "1//03DJiW9pQpKrhCgYIARAAGAMSNwF-L9IrFUm1_qLzsFJsIjp3Iz-TnDDV6ZUdn76d6df16Ny5_GG_K0tYhb5w9aNSKORorS20p2k",
+      "token": "ya29.a0ATi6K2tPin4JgPun5C0udSzoBpnMNOT3M0AcyDghSti-ef7qOTpobxex9R-485EFE2uhKGWE27eFWpd66UXZ-bblnHlo1BuV4SacIGIVsn6mBHQCAI_YanmJGHvR0ah_MCD3svYrQ2bDOwXq_WFUL5U7RT1xuaPz1KUH0k5UUOqwlx4cRzBhrfbgKDmiq8JnnYkBYwYaCgYKAfISARcSFQHGX2MiZKWsoxotYdcEzF-gctIYsA0206",
+      "refresh_token": "1//09qz5sCqateQ7CgYIARAAGAkSNwF-L9Ir3DO0YCP6U8rv2XaNEKB1arErKAuGh1Gvm1oYDd6SW0fIzb2m4fUXcTARe0XPAwZiAIw",
       "token_uri": "https://oauth2.googleapis.com/token",
       "client_id": "831518390260-44obqj2ja1ljjj29937uko99e05ipem5.apps.googleusercontent.com",
       "client_secret": "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",
@@ -63,7 +80,7 @@
       ],
       "universe_domain": "googleapis.com",
       "account": "",
-      "expiry": "2025-11-22T20:09:37Z"
+      "expiry": "2025-11-23T08:39:33Z"
     }
   }
 }
